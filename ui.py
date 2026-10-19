@@ -1,11 +1,10 @@
 import logging
 import os
 
-import httpx
 import streamlit as st
 from dotenv import load_dotenv
-from langchain_mistralai import ChatMistralAI
 from langchain_core.prompts import ChatPromptTemplate
+from langchain_google_genai import ChatGoogleGenerativeAI
 
 
 logger = logging.getLogger(__name__)
@@ -80,7 +79,7 @@ div.stButton > button{
 st.markdown("<div class='title'>🎬 CineSage</div>", unsafe_allow_html=True)
 
 st.markdown(
-    "<div class='subtitle'>AI-Powered Movie Information Extraction using LangChain + Mistral</div>",
+    "<div class='subtitle'>AI-Powered Movie Information Extraction using LangChain + Gemini</div>",
     unsafe_allow_html=True
 )
 
@@ -106,45 +105,66 @@ def get_setting(name, default=""):
     return str(value).strip()
 
 
-def mistral_error_message(error):
+def provider_status_code(error):
+    """Extract an HTTP-like status code from Google or LangChain errors."""
+    status_code = getattr(error, "status_code", None)
+    if status_code is None:
+        status_code = getattr(error, "code", None)
+    if callable(status_code):
+        status_code = status_code()
+    if hasattr(status_code, "value"):
+        status_code = status_code.value
+    if status_code is None and getattr(error, "response", None) is not None:
+        status_code = getattr(error.response, "status_code", None)
+
+    try:
+        return int(status_code)
+    except (TypeError, ValueError):
+        return None
+
+
+def gemini_error_message(error):
     """Turn a provider status into a safe, actionable UI message."""
-    status_code = error.response.status_code
+    status_code = provider_status_code(error)
 
     messages = {
-        400: "Mistral rejected the request. Check the configured model and input.",
-        401: "Mistral rejected the API key. Update MISTRAL_API_KEY in Streamlit Secrets.",
-        403: "This Mistral account cannot access the selected model. Check the account permissions or choose another model.",
-        404: "The configured Mistral model was not found. Check MISTRAL_MODEL in Streamlit Secrets.",
-        422: "Mistral could not process this request. Try shorter plain-text input.",
-        429: "The Mistral rate or usage limit has been reached. Check the account quota and billing, then try again.",
+        400: "Gemini rejected the request. Check the configured model and input.",
+        401: "Gemini rejected the API key. Update GEMINI_API_KEY in Streamlit Secrets.",
+        403: "This Gemini API key cannot access the selected model. Check the key's project and permissions.",
+        404: "The configured Gemini model was not found. Check GEMINI_MODEL in Streamlit Secrets.",
+        429: "The Gemini free-tier limit has been reached. Wait for the quota to reset, then try again.",
     }
 
-    if status_code >= 500:
-        return "Mistral is temporarily unavailable. Please try again shortly."
+    if status_code is not None and status_code >= 500:
+        return "Gemini is temporarily unavailable. Please try again shortly."
+
+    if status_code is None:
+        return "Could not complete the Gemini request. Check the app logs and try again."
 
     return messages.get(
         status_code,
-        f"Mistral returned an unexpected error (HTTP {status_code}). Please try again.",
+        f"Gemini returned an unexpected error (HTTP {status_code}). Please try again.",
     )
 
 
-api_key = get_setting("MISTRAL_API_KEY")
+api_key = get_setting("GEMINI_API_KEY")
 
 if not api_key:
     st.error(
-        "Mistral API key is missing. Set MISTRAL_API_KEY in Streamlit Secrets "
+        "Gemini API key is missing. Set GEMINI_API_KEY in Streamlit Secrets "
         "or in a local .env file."
     )
     st.stop()
 
-model_name = get_setting("MISTRAL_MODEL", "mistral-small-latest")
+model_name = get_setting("GEMINI_MODEL", "gemini-3.6-flash")
 
-llm = ChatMistralAI(
+llm = ChatGoogleGenerativeAI(
     model=model_name,
     temperature=0.3,
     api_key=api_key,
     max_retries=2,
     timeout=60,
+    max_tokens=1024,
 )
 
 
@@ -223,18 +243,12 @@ if extract:
                 response = chain.invoke({
                     "movie_description": movie_description
                 })
-        except httpx.HTTPStatusError as error:
+        except Exception as error:
             logger.exception(
-                "Mistral request failed with HTTP %s",
-                error.response.status_code,
+                "Gemini movie extraction failed with status %s",
+                provider_status_code(error),
             )
-            st.error(mistral_error_message(error))
-        except httpx.RequestError:
-            logger.exception("Could not connect to Mistral")
-            st.error("Could not connect to Mistral. Check the network and try again.")
-        except Exception:
-            logger.exception("Unexpected movie extraction failure")
-            st.error("The extraction failed unexpectedly. Please try again.")
+            st.error(gemini_error_message(error))
         else:
             st.success("Extraction Complete!")
 
@@ -270,7 +284,7 @@ with st.sidebar:
     st.markdown("""
 ### About
 
-CineSage extracts structured movie information from natural language descriptions using **LangChain** and **Mistral AI**.
+CineSage extracts structured movie information from natural language descriptions using **LangChain** and **Google Gemini**.
 
 ### Features
 

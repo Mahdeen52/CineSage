@@ -2,7 +2,7 @@
 
 **AI-Powered Movie Information Extraction**
 
-CineSage is a smart tool that reads a natural-language movie description and extracts the key information about it — cast, director, genre, ratings, plot, awards, and more — all in a clean, structured format. It is powered by **LangChain** and **Mistral AI**, and comes with a polished **Streamlit** web interface.
+CineSage is a smart tool that reads a natural-language movie description and extracts the key information about it — cast, director, genre, ratings, plot, awards, and more — all in a clean, structured format. The web app is powered by **LangChain** and **Google Gemini**, and comes with a polished **Streamlit** interface.
 
 ---
 
@@ -27,7 +27,7 @@ CineSage is a smart tool that reads a natural-language movie description and ext
 |------------|---------|
 | [Python](https://www.python.org/) | Core programming language |
 | [LangChain](https://www.langchain.com/) | Prompt templating & LLM orchestration |
-| [Mistral AI](https://mistral.ai/) | Language model for extraction |
+| [Google Gemini](https://ai.google.dev/) | Language model for web extraction |
 | [Streamlit](https://streamlit.io/) | Web interface |
 | [python-dotenv](https://pypi.org/project/python-dotenv/) | Environment variable management |
 
@@ -37,8 +37,8 @@ CineSage is a smart tool that reads a natural-language movie description and ext
 
 ```
 CineSage/
-├── core.py          # Extraction logic (LangChain + Mistral)
-├── ui.py            # Streamlit web interface
+├── core.py          # Legacy command-line extractor (Mistral)
+├── ui.py            # Streamlit web interface (Gemini)
 └── README.md        # You are here
 ```
 
@@ -49,7 +49,7 @@ CineSage/
 ### 1. Prerequisites
 
 - Python **3.9+**
-- A [Mistral AI API key](https://console.mistral.ai/)
+- A free [Gemini API key](https://aistudio.google.com/apikey)
 
 ### 2. Clone the repository
 
@@ -66,16 +66,16 @@ pip install -r requirements.txt
 
 ### 4. Set up your API key
 
-Create a `.env` file in the project root and add your Mistral key:
+Create a `.env` file in the project root and add your Gemini key:
 
 ```bash
-MISTRAL_API_KEY=your_api_key_here
-# Optional; defaults to mistral-small-latest
-MISTRAL_MODEL=mistral-small-latest
+GEMINI_API_KEY=your_api_key_here
+# Optional; defaults to gemini-3.6-flash
+GEMINI_MODEL=gemini-3.6-flash
 ```
 
-For Streamlit Community Cloud, add `MISTRAL_API_KEY` (and optionally
-`MISTRAL_MODEL`) under **Manage app → Settings → Secrets** instead. Changes to
+For Streamlit Community Cloud, add `GEMINI_API_KEY` (and optionally
+`GEMINI_MODEL`) under **Manage app → Settings → Secrets** instead. Changes to
 the local `.env` file are not deployed because that file is intentionally
 excluded from Git.
 
@@ -92,6 +92,9 @@ streamlit run ui.py
 ```bash
 python core.py
 ```
+
+The legacy command-line version still uses `MISTRAL_API_KEY`; the Streamlit web
+app does not.
 
 ---
 

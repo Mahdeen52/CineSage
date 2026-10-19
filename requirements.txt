@@ -1,7 +1,7 @@
 langchain
 langchain-core
 langchain-community
+langchain-google-genai>=4.0.0,<5
 langchain-mistralai
-httpx
 python-dotenv
 streamlit
