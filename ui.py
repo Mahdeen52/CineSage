@@ -80,12 +80,25 @@ st.markdown(
 # ==========================
 # Load Model
 # ==========================
+
 load_dotenv()
+
+if "MISTRAL_API_KEY" not in st.secrets:
+    st.error("Mistral API key is missing from Streamlit Secrets.")
+    st.stop()
+
+api_key = st.secrets["MISTRAL_API_KEY"].strip()
+
+if not api_key:
+    st.error("Mistral API key is empty.")
+    st.stop()
 
 llm = ChatMistralAI(
     model="mistral-small-2506",
-    temperature=0.3
+    temperature=0.3,
+    api_key=api_key
 )
+
 
 prompt = ChatPromptTemplate.from_messages([
     (
