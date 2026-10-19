@@ -147,6 +147,26 @@ def gemini_error_message(error):
     )
 
 
+def response_text(response):
+    """Return only user-visible text from a LangChain AI message."""
+    content = response.content
+    if isinstance(content, str):
+        return content
+
+    if isinstance(content, list):
+        text_parts = []
+        for block in content:
+            if isinstance(block, str):
+                text_parts.append(block)
+            elif isinstance(block, dict) and block.get("type") == "text":
+                text = block.get("text")
+                if text:
+                    text_parts.append(text)
+        return "\n".join(text_parts)
+
+    return str(content)
+
+
 api_key = get_setting("GEMINI_API_KEY")
 
 if not api_key:
@@ -164,7 +184,7 @@ llm = ChatGoogleGenerativeAI(
     api_key=api_key,
     max_retries=2,
     timeout=60,
-    max_tokens=1024,
+    max_tokens=4096,
 )
 
 
@@ -250,24 +270,17 @@ if extract:
             )
             st.error(gemini_error_message(error))
         else:
+            result_text = response_text(response)
             st.success("Extraction Complete!")
 
             st.markdown("## 📋 Extracted Information")
 
-            st.markdown(
-                f"""
-<div class="result-box">
-
-{response.content}
-
-</div>
-""",
-                unsafe_allow_html=True
-            )
+            with st.container(border=True):
+                st.markdown(result_text)
 
             st.download_button(
                 label="📥 Download Result",
-                data=response.content,
+                data=result_text,
                 file_name="movie_information.txt",
                 mime="text/plain"
             )
