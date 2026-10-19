@@ -94,7 +94,7 @@ if not api_key:
     st.stop()
 
 llm = ChatMistralAI(
-    model="mistral-small-2506",
+    model="mistral-small-2603",
     temperature=0.3,
     api_key=api_key
 )
