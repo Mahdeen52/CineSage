@@ -1,7 +1,14 @@
+import logging
+import os
+
+import httpx
 import streamlit as st
 from dotenv import load_dotenv
 from langchain_mistralai import ChatMistralAI
 from langchain_core.prompts import ChatPromptTemplate
+
+
+logger = logging.getLogger(__name__)
 
 # ==========================
 # Page Config
@@ -83,20 +90,61 @@ st.markdown(
 
 load_dotenv()
 
-if "MISTRAL_API_KEY" not in st.secrets:
-    st.error("Mistral API key is missing from Streamlit Secrets.")
-    st.stop()
 
-api_key = st.secrets["MISTRAL_API_KEY"].strip()
+def get_setting(name, default=""):
+    """Read local environment variables first, then Streamlit Secrets."""
+    value = os.getenv(name, "").strip()
+    if value:
+        return value
+
+    try:
+        value = st.secrets.get(name, default)
+    except Exception:
+        # A local Streamlit run may not have a secrets.toml file.
+        value = default
+
+    return str(value).strip()
+
+
+def mistral_error_message(error):
+    """Turn a provider status into a safe, actionable UI message."""
+    status_code = error.response.status_code
+
+    messages = {
+        400: "Mistral rejected the request. Check the configured model and input.",
+        401: "Mistral rejected the API key. Update MISTRAL_API_KEY in Streamlit Secrets.",
+        403: "This Mistral account cannot access the selected model. Check the account permissions or choose another model.",
+        404: "The configured Mistral model was not found. Check MISTRAL_MODEL in Streamlit Secrets.",
+        422: "Mistral could not process this request. Try shorter plain-text input.",
+        429: "The Mistral rate or usage limit has been reached. Check the account quota and billing, then try again.",
+    }
+
+    if status_code >= 500:
+        return "Mistral is temporarily unavailable. Please try again shortly."
+
+    return messages.get(
+        status_code,
+        f"Mistral returned an unexpected error (HTTP {status_code}). Please try again.",
+    )
+
+
+api_key = get_setting("MISTRAL_API_KEY")
 
 if not api_key:
-    st.error("Mistral API key is empty.")
+    st.error(
+        "Mistral API key is missing. Set MISTRAL_API_KEY in Streamlit Secrets "
+        "or in a local .env file."
+    )
     st.stop()
 
+model_name = get_setting("MISTRAL_MODEL", "mistral-small-latest")
+
 llm = ChatMistralAI(
-    model="mistral-small-2603",
+    model=model_name,
     temperature=0.3,
-    api_key=api_key
+    api_key=api_key,
+    max_retries=2,
+    timeout=60,
 )
 
 
@@ -170,33 +218,45 @@ if extract:
         st.warning("Please enter a movie description.")
     else:
 
-        with st.spinner("Analyzing movie description..."):
+        try:
+            with st.spinner("Analyzing movie description..."):
+                response = chain.invoke({
+                    "movie_description": movie_description
+                })
+        except httpx.HTTPStatusError as error:
+            logger.exception(
+                "Mistral request failed with HTTP %s",
+                error.response.status_code,
+            )
+            st.error(mistral_error_message(error))
+        except httpx.RequestError:
+            logger.exception("Could not connect to Mistral")
+            st.error("Could not connect to Mistral. Check the network and try again.")
+        except Exception:
+            logger.exception("Unexpected movie extraction failure")
+            st.error("The extraction failed unexpectedly. Please try again.")
+        else:
+            st.success("Extraction Complete!")
 
-            response = chain.invoke({
-                "movie_description": movie_description
-            })
+            st.markdown("## 📋 Extracted Information")
 
-        st.success("Extraction Complete!")
-
-        st.markdown("## 📋 Extracted Information")
-
-        st.markdown(
-            f"""
+            st.markdown(
+                f"""
 <div class="result-box">
 
 {response.content}
 
 </div>
 """,
-            unsafe_allow_html=True
-        )
+                unsafe_allow_html=True
+            )
 
-        st.download_button(
-            label="📥 Download Result",
-            data=response.content,
-            file_name="movie_information.txt",
-            mime="text/plain"
-        )
+            st.download_button(
+                label="📥 Download Result",
+                data=response.content,
+                file_name="movie_information.txt",
+                mime="text/plain"
+            )
 
 # ==========================
 # Sidebar

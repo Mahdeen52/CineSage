@@ -70,9 +70,14 @@ Create a `.env` file in the project root and add your Mistral key:
 
 ```bash
 MISTRAL_API_KEY=your_api_key_here
+# Optional; defaults to mistral-small-latest
+MISTRAL_MODEL=mistral-small-latest
 ```
 
-> **Note:** LangChain's `ChatMistralAI` automatically reads the `MISTRAL_API_KEY` variable from your environment.
+For Streamlit Community Cloud, add `MISTRAL_API_KEY` (and optionally
+`MISTRAL_MODEL`) under **Manage app → Settings → Secrets** instead. Changes to
+the local `.env` file are not deployed because that file is intentionally
+excluded from Git.
 
 ### 5. Run the app
 
